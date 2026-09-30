@@ -1,0 +1,753 @@
+import json
+import os
+import random
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+SHIP_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "ships.json")
+
+
+def _pair_key(a: int, b: int) -> str:
+    x, y = sorted([a, b])
+    return f"{x}-{y}"
+
+
+def _load_ships() -> dict:
+    try:
+        with open(SHIP_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_ships(data: dict) -> None:
+    os.makedirs(os.path.dirname(SHIP_FILE), exist_ok=True)
+    with open(SHIP_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+
+def _get_ship(key: str) -> tuple[int, bool]:
+    """Returns (pct, is_fresh_roll). No expiry — manual /ship refresh only."""
+    ships = _load_ships()
+    entry = ships.get(key)
+    if entry:
+        return entry["pct"], False
+    pct = random.randint(0, 100)
+    ships[key] = {"pct": pct}
+    _save_ships(ships)
+    return pct, True
+
+
+def _refresh_all_ships() -> int:
+    ships = _load_ships()
+    for key in ships:
+        ships[key] = {"pct": random.randint(0, 100)}
+    _save_ships(ships)
+    return len(ships)
+
+
+def _ship_verdict(pct: int) -> str:
+    if pct < 20:
+        return "yikes, just friends. distant friends"
+    elif pct < 40:
+        return "kinda mid, needs more delulu"
+    elif pct < 60:
+        return "decent duo, could cook"
+    elif pct < 80:
+        return "cute match, wedding soon?"
+    elif pct < 95:
+        return "power couple energy"
+    else:
+        return "SOULMATES, no debate"
+
+
+def _ship_bar(pct: int) -> str:
+    filled = pct // 10
+    return "\u2764\ufe0f" * filled + "\U0001f5a4" * (10 - filled)
+
+
+class Ship(app_commands.Group, name="ship", description="Ship two users"):
+    @app_commands.command(name="pair", description="Ship two users with a love %")
+    @app_commands.describe(
+        user1="First person", user2="Second person (defaults to you)"
+    )
+    async def pair(
+        self,
+        interaction: discord.Interaction,
+        user1: discord.Member,
+        user2: discord.Member | None = None,
+    ):
+        u2 = user2 or interaction.user
+        key = _pair_key(user1.id, u2.id)
+        pct, fresh = _get_ship(key)
+        tag = "fresh roll!" if fresh else "cached, use /ship refresh to re-roll all"
+        await interaction.response.send_message(
+            f"\U0001f495 {user1.mention} x {u2.mention} — **{pct}%** ({tag})\n"
+            f"{_ship_bar(pct)}\n{_ship_verdict(pct)}."
+        )
+
+    @app_commands.command(name="refresh", description="Re-roll ALL ships")
+    async def refresh(self, interaction: discord.Interaction):
+        count = _refresh_all_ships()
+        if count == 0:
+            await interaction.response.send_message(
+                "No ships cached yet — use `/ship pair` first."
+            )
+        else:
+            await interaction.response.send_message(
+                f"\U0001f495 Refreshed **{count}** ship(s)! Use `/ship pair` to see the new rolls."
+            )
+
+PP_SMALL = [
+    "so small it needs a microscope holding a microscope",
+    "fell off the ruler and nobody noticed",
+    "ants filed a missing persons report",
+    "legally classified as a rounding error",
+    "waves at atoms from below",
+    "uses a grain of rice as a blanket",
+    "needs GPS just to be found",
+    "even bacteria are unimpressed",
+    "so tiny it pays micro-taxes",
+    "quantum physicists want to study it",
+    "invisible to the naked eye and most telescopes",
+    "Thanos snapped and it stayed gone",
+    "your WiFi signal is bigger",
+    "went on vacation and never came back",
+    "needs a search party and a magnifying glass",
+    "so short it trips over dots",
+    "NASA lost track of it",
+    "nominated for smallest cameo ever",
+    "makes a peanut look massive",
+    "Dora could not explore this, too small",
+    "is that a pp or a typo",
+    "Ctrl+F cannot find it",
+    "404 pp not found",
+    "loading... still loading... gave up",
+    "has negative length, bends physics",
+    "pays rent inside a thimble",
+    "even your shadow is disappointed",
+    "doctors recommend a telescope, not a mirror",
+    "needs an electron microscope for compliments",
+    "certified tic-tac sized",
+    "emits its own sad trombone sound",
+    "got an F in growth",
+    "evolution skipped this one",
+    "identifies as a dot",
+    "your belt is the only thing holding hope",
+    "hamsters take notes on its smallness",
+    "shrinks in the wash and always",
+    "even Lego pieces feel superior",
+    "needs a booster seat to be seen",
+    "so small it dodges raindrops with ease",
+    "could hide behind a comma",
+    "gets lost in pocket lint",
+    "requires a treasure map with an X",
+    "so little it has imposter syndrome around belly buttons",
+    "voted most likely to disappear",
+    "has its own witness protection program",
+    "so compact it saves on data",
+    "shorter than your attention span",
+    "needs a ladder to reach average",
+    "got friend-zoned by a ruler",
+    "measuring tape laughed and quit",
+    "so small it high-fives molecules",
+    "could park inside a Cheerio",
+    "archaeologists cannot dig that small",
+    "so tiny it echoes inside a bottle cap",
+    "needs night vision to be detected at noon",
+    "smaller than your chances on a Monday",
+    "fits in a fortune cookie with room to spare",
+    "so little it needs subtitles to be noticed",
+    "banned from hide and seek for being OP",
+    "uses a stamp as a yoga mat",
+    "so small it gets cell service nowhere",
+    "could bunk with a dust mite",
+    "needs a periscope to peek out",
+    "shorter than a loading screen tip",
+    "so tiny autocorrect ignores it",
+    "uses a matchbox as a studio apartment",
+    "needs a flashlight and a prayer",
+    "so small it files as a footnote",
+    "could surf on a Dorito crumb",
+    "gets mistaken for a pixel",
+    "needs a hype man just to exist",
+    "so little it needs a step stool for ants",
+    "shorter than a Vine clip",
+    "uses a sock as a sleeping bag and still gets lost",
+    "so tiny it got rejected by a microchip",
+    "needs binoculars at point blank",
+    "could hide in your keyboard gap forever",
+    "so small it whispers to germs",
+    "gets outperformed by a button",
+    "needs a documentary crew to prove it exists",
+    "so little it has its own black hole of disappointment",
+    "could live in a Lego house with high ceilings",
+    "shorter than your patience in traffic",
+    "needs a rescue team of tardigrades",
+    "so tiny it surfs WiFi waves",
+    "gets carded by microbes",
+    "uses a coin slot as a hallway",
+    "so small it needs a zoom meeting to be seen IRL",
+    "could nap inside a pistachio shell",
+    "needs a spotlight the size of the sun",
+    "so little it makes a grain of sand look confident",
+    "has its own support group for lost length",
+    "could use a paperclip as a diving board",
+    "so tiny it gets vertigo on a dime",
+    "needs a translator to talk to small things",
+    "shorter than the cooldown on this command",
+    "so small it needs DLC to grow",
+    "scientists call it a rounding miracle",
+    "bro really rolled 0 in the character creator",
+]
+
+PP_MID = [
+    "perfectly average, NPC build",
+    "mid but confident about it",
+    "not small, not huge, just vibing",
+    "respectable, pays taxes on time",
+    "solidly okay, participation trophy earned",
+    "average is the new meta",
+    "mid-tier warrior, still in the game",
+    "decent, gets the job done on weekdays",
+    "neither impressive nor embarrassing",
+    "textbook definition of fine",
+    "painfully average, like store-brand cereal",
+    "mid with potential, coach believes in you",
+    "standard issue, no upgrades, no defects",
+    "perfectly balanced, like mediocrity intended",
+    "aggressively okay",
+    "sits exactly in the middle and refuses to move",
+    "bronze medal of pp sizes",
+    "reliable like a Toyota Corolla",
+    "not winning awards, not losing either",
+    "certified regular dude energy",
+    "mid energy, high confidence",
+    "average length, above-average excuses",
+    "meets minimum requirements and stops there",
+    "the human equivalent of plain white rice",
+    "fine. just fine. stop asking",
+    "good enough for government work",
+    "middle of the pack, leader of nothing",
+    "perfectly adequate, HR approved",
+    "mid and proud, barely",
+    "no complaints filed, no compliments either",
+    "standard definition in a 4K world",
+    "default settings, never changed",
+    "factory standard, no DLC installed",
+    "gets a polite golf clap",
+    "average Joe in its final form",
+    "not short enough to roast, not long enough to brag",
+    "exists. that is the review",
+    "C+ student of pp world",
+    "midnight snack sized, satisfies at 2am",
+    "competent but unremarkable",
+    "like decaf coffee, technically counts",
+    "middle child energy",
+    "perfectly calibrated to disappoint no one greatly",
+    "okay enough to keep, not enough to show off",
+    "the beige Toyota of downstairs",
+    "mid diff, no clear winner",
+    "average with main character confidence",
+    "stable, consistent, forgettable",
+    "not microscopic, not legendary, just there",
+    "participation award secured",
+    "slightly above closed beta, below launch",
+    "normal distribution poster child",
+    "exactly what it says on the box, nothing more",
+    "serviceable, like airport food",
+    "mid-season filler episode energy",
+    "neither nerfed nor buffed",
+    "balanced patch, devs left it alone",
+    "standard-issue adventurer gear",
+    "common rarity, no shine",
+    "unranked but trying its best",
+    "tutorial-level equipment",
+    "gets the job done with supervision",
+    "adequate under ideal conditions",
+    "fits the dress code exactly",
+    "passes inspection with a shrug",
+    "straight C student with good attendance",
+    "the plain bagel of the group",
+    "mid, but makes up for it with personality. allegedly",
+    "average stats, maxed-out copium",
+    "not elite, not trash, just midfield",
+    "comfortably mediocre",
+    "defined as normal in three dictionaries",
+    "benchmark for averageness",
+    "demo version of a legend",
+    "seasonal average, no records broken",
+    "consistent 5 out of 10",
+    "like tap water, does the job",
+    "middle lane cruiser",
+    "no buffs, no debuffs, pure vanilla",
+    "entry-level legend in training",
+    "waits in the middle of every line",
+    "statistically unremarkable",
+    "your honor, it is just mid",
+    "bronze tier with silver dreams",
+    "average height in pp society",
+    "the control group",
+    "scientifically okay",
+    "ranked exactly 50th percentile",
+    "neither cursed nor blessed",
+    "plain, but reliable",
+    "works on most days, rests on Sundays",
+    "mid build, no patch notes",
+    "right in the meat. er, middle",
+    "certified alright",
+    "the definition of it is what it is",
+    "not small enough for sympathy, not big enough for fame",
+    "keeps expectations perfectly managed",
+    "the filler arc of manhood",
+    "shows up, clocks in, clocks out",
+    "medium fries energy",
+]
+
+PP_HUGE = [
+    "ABSOLUTE UNIT, needs its own zip code",
+    "legendary size, bards sing about it",
+    "third leg confirmed, CDC notified",
+    "so massive it has its own gravity",
+    "certified tree trunk, lumberjack approved",
+    "needs a license to carry that thing",
+    "NASA can see it from orbit",
+    "final boss of downstairs",
+    "so huge it pays double rent",
+    "requires a seatbelt and a warning label",
+    "mythical beast status unlocked",
+    "donkey kong energy radiating",
+    "so large it has loading screens",
+    "needs its own area code",
+    "tourists take photos of it",
+    "banned in three small countries for intimidation",
+    "so massive it files its own taxes separately",
+    "uses a fire hose as a sock",
+    "earthquake detected when it moves",
+    "legend says it has its own weather system",
+    "XXL, and the Xs keep coming",
+    "so big Google Maps blurs it out",
+    "requires wide-load escort vehicles",
+    "astronauts use it for scale",
+    "so huge it got nerfed in the last patch and still OP",
+    "carries its own insurance policy",
+    "national treasure, museum wants it",
+    "so large it echoes twice",
+    "needs a co-pilot and a flight plan",
+    "certified monster truck rally downstairs",
+    "breaks rulers just by existing",
+    "so big it has plot armor",
+    "uses a burrito as a cozy",
+    "local legend, kids whisper about it",
+    "so massive it bends light",
+    "requires parental advisory sticker",
+    "wields it like Excalibur",
+    "so huge scientists gave up measuring",
+    "has its own fan club and merch line",
+    "uses a shipping container for storage",
+    "so large it counts as carry-on luggage",
+    "needs crowd control barriers",
+    "walks with a legendary waddle of power",
+    "so big it has its own theme music",
+    "certified skyscraper, penthouse included",
+    "makes statues jealous",
+    "so huge it needs a username and password",
+    "requires two-factor authentication to view",
+    "uses the Nile as a size comparison",
+    "so large historians will study it",
+    "breaks the scale, literally snapped it",
+    "needs a documentary and a sequel",
+    "so big it got its own constellation",
+    "uses a red carpet as toilet paper. respectfully",
+    "certified kaiju downstairs",
+    "so massive elevators have a separate limit for it",
+    "requires a building permit",
+    "uses a python as a size reference and wins",
+    "so huge it has lobby music",
+    "needs air traffic control clearance",
+    "local landmark status pending",
+    "so large it casts shade on sunny days",
+    "runs on premium fuel only",
+    "uses a flagpole as a measuring stick",
+    "so big it needs a subtitle: TO BE CONTINUED",
+    "has its own gravitational pull on admirers",
+    "certified anaconda slayer",
+    "so huge it needs intermission breaks",
+    "requires stadium seating",
+    "uses a canoe as a shoe",
+    "so large it has chapters, not inches",
+    "needs a bouncer just for itself",
+    "mythic rarity, 0.001% drop rate",
+    "so big the group chat went silent",
+    "requires a crane operator license",
+    "uses Saturns rings for comparison and still wins",
+    "so huge it needs its own lore video",
+    "certified main event, no opener needed",
+    "breaks tape measures for fun",
+    "so large it qualifies as a dependent",
+    "needs its own Netflix series",
+    "uses a subway sandwich for scale and dwarfs it",
+    "so big it has a waiting list to witness",
+    "requires a hype man and a choir",
+    "walks in and the room lags",
+    "so massive it needs a patch to balance the server",
+    "uses a telescope backwards to look smaller",
+    "certified colossal, titan class",
+    "so huge it got buffed by accident",
+    "needs a parade permit everywhere it goes",
+    "uses a garden hose as a hair tie",
+    "so large it has an echo with reverb",
+    "requires a signature to behold",
+    "bro maxed all stats on creation",
+    "so big Zeus asked for tips",
+    "needs its own monument in Washington",
+    "certified history-maker downstairs",
+    "so huge the census counted it twice",
+    "uses a blanket as a sock and still hangs out",
+    "needs a bodyguard for the bodyguard",
+]
+
+
+ROASTS = [
+    "you have the charisma of a loading screen",
+    "you bring the energy of a group project freeloader",
+    "your brain has too many tabs open and all frozen",
+    "you are the human equivalent of a typo",
+    "your vibe is buffering",
+    "you have main character confidence with NPC lore",
+    "your comebacks need a software update",
+    "you are proof that autopilot exists for humans",
+    "your aura is just low battery warning",
+    "you walk around with tutorial-level luck",
+    "your jokes need a laugh track to survive",
+    "you are a plot hole in human form",
+    "your rizz is just WiFi disconnecting",
+    "you have the stealth of a marching band",
+    "your ideas need a loading bar",
+    "you are a side quest nobody asked for",
+    "your fashion sense is just random loot",
+    "you peaked in the tutorial",
+    "your brain runs on airplane mode",
+    "you are the reason aliens will not visit",
+    "your personality is just default settings",
+    "you have the range of a puddle",
+    "your confidence is impressive for someone so wrong",
+    "you are a background extra with delusions of sequel",
+    "your takes are expired milk",
+    "you type like your keyboard owes you money",
+    "your sleep schedule is a cry for help",
+    "you are a beta test that never launched",
+    "your aura got friend-zoned by itself",
+    "you move like lag in real life",
+    "your playlist is just red flags with bass",
+    "you are a jump scare with no scare",
+    "your luck is just skill issue in disguise",
+    "you have plot armor but no plot",
+    "your group chat mutes you in spirit",
+    "you are a DLC nobody bought",
+    "your energy bill must be high for how draining you are",
+    "you are the human version of captcha",
+    "your brain does buffering circles",
+    "you are a glitch that became a feature, unfortunately",
+    "your phone autocorrects you out of embarrassment",
+    "you have the intimidation factor of a goldfish",
+    "your reflection asked for a day off",
+    "you are a spoiler with no movie",
+    "your high score is just participation",
+    "you bring elevator music energy to parties",
+    "your life needs a skip intro button",
+    "you are a cliffhanger nobody follows up on",
+    "your GPS reroutes just to avoid you",
+    "you have the accuracy of a stormtrooper",
+    "your mixtape is just notification sounds",
+    "you are a group chat typo that never got fixed",
+    "your style is just whatever was on the floor",
+    "you argue with autocorrect and lose",
+    "your aura needs a system reboot",
+    "you are a pop-up ad in human form",
+    "your cooking sets off smoke alarms emotionally",
+    "you have the depth of a kiddie pool",
+    "you are a trailer with no film",
+    "your dance moves violate terms of service",
+    "you peaked at hide and seek and still got found first",
+    "your brain is just one browser tab playing music somewhere",
+    "you are a plot twist nobody wanted",
+    "your selfies need a trigger warning for boredom",
+    "you have the social battery of a potato",
+    "your jokes get skipped like ads",
+    "you are a speed bump on the road to cool",
+    "your opinions come with a mute button",
+    "you collect red flags like Pokemon",
+    "your charm expired in 2019",
+    "you are a lag spike with shoes",
+    "your fit is just respawn default",
+    "you talk like a terms and conditions page",
+    "your laugh has a buffering delay",
+    "you are a participation trophy that talks",
+    "your texts read like spam folder poetry",
+    "you have the momentum of a parked car",
+    "your comebacks arrive next business day",
+    "you are a tutorial boss everyone beats first try",
+    "your closet is just regret in fabric form",
+    "you flirt like a phishing email",
+    "your hairline is playing hide and seek and winning",
+    "you are a mobile game ad: misleading and loud",
+    "your sleep schedule is sponsored by chaos",
+    "you have the coordination of a newborn giraffe",
+    "your voice cracks like cheap WiFi",
+    "you are a chess pawn with king delusions",
+    "your handshake feels like a software crash",
+    "you are the loading tip nobody reads",
+    "your ambition takes naps",
+    "you are a microwave meal with no flavor",
+    "your posture is just a question mark",
+    "you have the focus of a goldfish in a mirror maze",
+    "your music taste is just algorithm punishment",
+    "you are a flashlight with dying batteries",
+    "your plans fall apart like wet paper",
+    "you are a captcha that even robots fail",
+    "your sneakers squeak apologies when you walk",
+    "you look like you fast travel everywhere and still arrive late",
+    "your brain lags during easy questions",
+    "you are a comment section come to life",
+    "your energy is just dial-up tone",
+    "you are a movie with 2 stars and 400 reviews saying why",
+    "your drip is just a leaky faucet",
+    "you have the presence of an unread email",
+    "your shadow left to find someone cooler",
+    "you are a patch note with only nerfs",
+    "your smile looks like it is buffering",
+    "you are a vending machine that eats coins",
+    "your thoughts have ads every 30 seconds",
+    "you bring NPC dialogue to boss fights",
+    "your confidence is just volume with no bass",
+    "you are a calendar invite everyone declines",
+    "your style got patched out",
+    "you have the agility of a fridge",
+    "your group photos need a where is Waldo for your rizz",
+    "you are a respawn point for bad takes",
+    "your kitchen fears you",
+    "you have the mic presence of a muted tab",
+    "your life is just side quests with no XP",
+    "you are a parking ticket in human form",
+    "your hair has given up on you",
+    "you talk in spoilers for shows nobody watches",
+    "your aura got a one-star review",
+    "you are a broken escalator: stairs with extra steps",
+    "your flex is just creative lighting",
+    "you have the grip strength of a wet napkin",
+    "your ideas get outvoted by your own brain",
+    "you are a demo that never got full release",
+    "your phone battery dies just to escape you",
+    "you walk like cutscenes you cannot skip",
+    "your rizz is just proximity plus pity",
+    "you are a software trial that expired",
+    "your bedtime is just a suggestion you ignore badly",
+    "you have the timing of a delayed text",
+    "your mirror charges you admission for horror shows",
+    "you are a loot box with only commons",
+    "your presentations put coffee to sleep",
+    "you have the spice tolerance of vanilla ice",
+    "your jokes need subtitles and apologies",
+    "you are a traffic cone with dreams",
+    "your camera roll is just screenshots of failure",
+    "you snore like dial-up connecting",
+    "your squad carries you like a cursed artifact",
+    "you are a weather forecast that is always wrong",
+    "your handshake is just a high-five that gave up",
+    "you have the vertical of a pancake",
+    "your cooking could be used as a punishment",
+    "you are a meeting that could have been an email",
+    "your brain has pop-ups it cannot close",
+    "you dance like your controller is disconnected",
+    "your voice chat gets muted by default",
+    "you have the fashion sense of a default avatar",
+    "your comebacks need a director's cut to make sense",
+    "you are a final exam with no study guide",
+    "your pet judges you silently",
+    "you blink in Morse code for help",
+    "your goals have restraining orders against you",
+    "you are a screensaver nobody watches",
+    "your texts take three follow-ups to understand",
+    "you have the cardio of a sloth on vacation",
+    "your takes age like milk in the sun",
+    "you are a plot device with no payoff",
+    "your closet is a crime scene of style",
+    "you laugh at your own jokes because no one else will",
+    "your GPS says recalculating when you enter",
+    "you are a browser history everyone deletes",
+    "your hugs feel like software updates: forced",
+    "you have the memory of a goldfish with amnesia",
+    "your style is just whatever loaded first",
+    "you are a jump cut in a boring vlog",
+    "your alarm snoozes you",
+    "you bring decaf energy to espresso people",
+    "your selfies look like witness protection photos",
+    "you are a side character in your own story",
+    "your chair creaks in disappointment when you sit",
+    "you have the delivery of a delayed package",
+    "your brain is still on the loading dock",
+    "you are a parking spot everyone drives past",
+    "your compliments sound like backhanded error codes",
+    "you move like a PowerPoint transition",
+    "your fashion is just laundry day extended",
+    "you are a group project grade anchor",
+    "your singing makes dogs file complaints",
+    "you have the aura of an empty fridge",
+    "your plans have plans to avoid you",
+    "you are a microwave beep at 3am: annoying and pointless",
+    "your height is just a rumor",
+    "you argue like a comments section mod on power trip",
+    "your haircut filed for divorce",
+    "you are a tutorial nobody finishes",
+    "your wallet fears your decisions",
+    "you have the stealth of a fire alarm test",
+    "your stories need a skip button",
+    "you are a typo in the book of life",
+    "your vibe check bounced",
+    "you collect L's like trading cards",
+    "your brain is on low power mode permanently",
+    "you are a bus that never arrives on time",
+    "your fit check failed the background check",
+    "you whisper like a broken speaker",
+    "your talent show act was just showing up",
+    "you have the lighting of a horror game",
+    "your DMs are just you asking for homework",
+    "you are a rerun nobody requested",
+    "your posture is sponsored by regret",
+    "you nap through your own stories",
+    "your keyboard has a dedicated facepalm key for you",
+    "you are a Terms and conditions boss fight",
+    "your laugh track is just crickets",
+    "you have the aim of a blindfolded dart player",
+    "your fridge light is the highlight of your parties",
+    "you are a cliff notes version of a person",
+    "your playlist is just one song on repeat and it is mid",
+    "you bring soggy fry energy",
+    "your brain blue-screens at small talk",
+    "you are a participation ribbon with anxiety",
+    "your mirror fogs itself to avoid you",
+    "you type in all caps when excited and all wrong when serious",
+    "your sneakers have more mileage in excuses",
+    "you are a loading bar stuck at 99 percent",
+    "your jokes get patched out the next day",
+    "you have the drip of a melting ice cube",
+    "your squad lists you as emergency contact for cringe",
+    "you are a free trial with no premium features",
+    "your voice cracks at plot twists",
+    "you collect dust like it is a hobby",
+    "your aura needs a search warrant to be found interesting",
+    "you are a speedrun of bad decisions",
+    "your hairline is in witness protection",
+    "you bring library voice to a concert",
+    "your texts autocorrect to nonsense and it improves them",
+    "you are a boss fight with no loot",
+    "your cooking show would be a horror series",
+    "you have the stage presence of a houseplant",
+    "your ideas get ratioed by your own diary",
+    "you are a software bug with confidence",
+    "your selfies get flagged as blurry content",
+    "you walk into rooms and WiFi drops",
+    "your group chat has a channel just to mute you",
+    "you are a plot armor with no hero",
+    "your fashion week is just laundry week",
+    "you have the rhythm of a lagging metronome",
+    "your brain takes coffee breaks during conversations",
+    "you are a save file nobody loads",
+    "your compliments need a fact check",
+    "you dance like notifications popping",
+    "your alarm clock gave up on you",
+    "you are a DLC with no new content",
+    "your fridge judges your life choices",
+    "you have the charisma of airplane safety video",
+    "your stories have trailers longer than the story",
+    "you are a group photo photobomb by default",
+    "your singing voice is a jump scare",
+    "you bring homework energy to weekends",
+    "your posture filed a complaint",
+    "you are a pop quiz with no right answers",
+    "your vibe is just expired coupon",
+    "you have the luck of drawing the short straw twice",
+    "your brain buffers at 144p",
+    "you are a side dish with no main course",
+    "your texts need a translator and a priest",
+    "you walk like the floor is lava and you already lost",
+    "your mirror needs a content warning",
+    "you are a software license nobody renews",
+    "your jokes are justdad noises",
+    "you have the depth of a puddle in drought",
+    "your squad uses you as a cautionary tale",
+    "you are a traffic jam in human form",
+    "your style is just glitchcore by accident",
+    "you nap like it is a competitive sport and still lose",
+    "your brain runs Internet Explorer",
+    "you are a filler episode with recaps",
+    "your charm is just loud volume",
+    "you have the accuracy of a weather app",
+    "your selfies need a search party to find the point",
+    "you are a meeting invite with no agenda",
+    "your cooking alarms the neighbors emotionally",
+    "you bring elevator silence to voice chats",
+    "your closet is just one chair with clothes",
+    "you are a tutorial tooltip that never goes away",
+    "your laugh is just a system error beep",
+    "you have the glow of a dying lightbulb",
+    "your ideas need a reboot",
+    "you are a parking ticket with legs",
+    "your texts are just keyboard smashes with hope",
+    "you dance like a screensaver glitching",
+    "your aura is just static noise",
+    "you are a low battery warning in a storm",
+    "your brain has too many pop-ups",
+    "you collect awkward silences",
+    "your fit is just pajamas with confidence",
+    "you are a loading screen in a cutscene",
+    "your comebacks need GPS to land",
+    "you have the stage fright of a statue",
+    "your playlist is just ads for better songs",
+    "you are a respawn with no checkpoint",
+    "your mirror practices self-care by ignoring you",
+    "you talk like a Terms of Service speedrun",
+    "your hugs have a loading delay",
+]
+
+class Fun(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    @app_commands.command(name="roast", description="Lightly roast someone")
+    @app_commands.describe(user="Person to roast (defaults to you)")
+    async def roast(
+        self, interaction: discord.Interaction, user: discord.Member | None = None
+    ):
+        target = user or interaction.user
+        blurb = random.choice(ROASTS)
+        await interaction.response.send_message(f"{target.mention}, {blurb}.")
+
+    @app_commands.command(name="pp", description="Check pp size")
+    @app_commands.describe(user="Person to check (defaults to you)")
+    async def pp(
+        self, interaction: discord.Interaction, user: discord.Member | None = None
+    ):
+        target = user or interaction.user
+        size = random.randint(0, 12)
+        bar = "8" + "=" * size + "D" if size > 0 else "o"
+        if size <= 3:
+            blurb = random.choice(PP_SMALL)
+            tier = "SMOL"
+        elif size <= 8:
+            blurb = random.choice(PP_MID)
+            tier = "MID"
+        else:
+            blurb = random.choice(PP_HUGE)
+            tier = "HUGE"
+        await interaction.response.send_message(
+            f"{target.mention}'s pp [{tier}]: `{bar}` — {blurb}."
+        )
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Fun(bot))
+    bot.tree.add_command(Ship())
