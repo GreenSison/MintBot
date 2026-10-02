@@ -11,4 +11,5 @@ jobs:
     steps:
       - name: Ping health endpoint
         run: |
-          curl --fail --max-time 30 https://mintbot-h0vg.onrender.com/healthz
+          BODY=$(curl --fail --max-time 30 https://mintbot-h0vg.onrender.com/healthz)
+          echo "$BODY"
