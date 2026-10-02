@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 import discord
@@ -6,6 +7,9 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("discord").setLevel(logging.INFO)
 
 from keep_alive import start as start_webserver
 from utils.config import TOKEN, PREFIX, PORT
@@ -37,10 +41,23 @@ async def load_cogs():
                 print(f"Failed to load cog {filename}: {e}")
 
 
+def discord_status() -> dict:
+    user = str(bot.user) if bot.user else None
+    try:
+        latency = round(bot.latency * 1000) if not bot.is_closed() else None
+    except Exception:
+        latency = None
+    return {
+        "discord_connected": bot.user is not None and not bot.is_closed(),
+        "discord_user": user,
+        "discord_latency_ms": latency,
+    }
+
+
 async def main():
     # Start dummy web server first so Render detects an open port,
     # then run the Discord bot alongside it.
-    web_task = asyncio.create_task(start_webserver(PORT))
+    web_task = asyncio.create_task(start_webserver(PORT, discord_status))
     async with bot:
         await load_cogs()
         try:
