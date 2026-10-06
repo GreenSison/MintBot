@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 
 import discord
 from discord.ext import commands
@@ -8,11 +9,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("discord").setLevel(logging.INFO)
+
+def setup_logging(level: str = "INFO") -> None:
+    numeric = getattr(logging, level.upper(), logging.INFO)
+    logging.basicConfig(
+        level=numeric,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        stream=sys.stdout,
+        force=True,
+    )
+    # Quiet noisy libs unless DEBUG.
+    if numeric > logging.DEBUG:
+        for noisy in ("discord.http", "discord.gateway", "aiohttp.access"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 from keep_alive import start as start_webserver
-from utils.config import TOKEN, PREFIX, PORT
+from utils.config import TOKEN, PREFIX, PORT, GUILD_ID
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -25,7 +41,16 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user} ({bot.user.id})")
     try:
-        synced = await bot.tree.sync()
+        # GUILD_ID set: guild-scoped sync for instant iteration (no 1h global wait).
+        # Otherwise: global sync.
+        if GUILD_ID:
+            guild = discord.Object(id=int(GUILD_ID))
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            print(f"Synced {len(synced)} command(s) to guild {GUILD_ID}")
+            synced = await bot.tree.sync()
+        else:
+            synced = await bot.tree.sync()
         print(f"Synced {len(synced)} slash command(s)")
     except Exception as e:
         print(f"Slash sync failed: {e}")
