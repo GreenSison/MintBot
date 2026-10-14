@@ -40,6 +40,23 @@ bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user} ({bot.user.id})")
+
+
+async def load_cogs():
+    for filename in os.listdir("./cogs"):
+        if filename.endswith(".py") and not filename.startswith("_"):
+            try:
+                await bot.load_extension(f"cogs.{filename[:-3]}")
+                print(f"Loaded cog: {filename[:-3]}")
+            except Exception as e:
+                print(f"Failed to load cog {filename}: {e}")
+
+
+async def setup_hook():
+    # Runs once per process start (unlike on_ready, which fires on every
+    # gateway reconnect). Syncing here avoids re-registering commands on
+    # each reconnect — that storm is what trips Discord's global 429s.
+    await load_cogs()
     try:
         # GUILD_ID set: guild-scoped sync for instant iteration (no 1h global wait).
         # Otherwise: global sync.
@@ -56,14 +73,7 @@ async def on_ready():
         print(f"Slash sync failed: {e}")
 
 
-async def load_cogs():
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py") and not filename.startswith("_"):
-            try:
-                await bot.load_extension(f"cogs.{filename[:-3]}")
-                print(f"Loaded cog: {filename[:-3]}")
-            except Exception as e:
-                print(f"Failed to load cog {filename}: {e}")
+bot.setup_hook = setup_hook
 
 
 def discord_status() -> dict:
@@ -84,7 +94,6 @@ async def main():
     # then run the Discord bot alongside it.
     web_task = asyncio.create_task(start_webserver(PORT, discord_status))
     async with bot:
-        await load_cogs()
         try:
             await bot.start(TOKEN)
         finally:
