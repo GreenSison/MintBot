@@ -4,6 +4,19 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+SIDE_QUIPS = [
+    "physics just filed a complaint",
+    "1-in-100 luck. go buy a lottery ticket",
+    "the coin has chosen violence against probability",
+    "scientists are on their way to study this",
+    "bro broke math",
+    "that has never happened before and will never happen again",
+    "call NASA. or a priest. or both",
+    "the coin simply refused to decide",
+    "edge lord behavior, literally",
+    "somewhere, a statistician just fainted",
+]
+
 
 class General(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -19,7 +32,14 @@ class General(commands.Cog):
 
     @app_commands.command(name="flip", description="Flip a coin")
     async def flip(self, interaction: discord.Interaction):
-        await interaction.response.send_message(random.choice(["Heads", "Tails"]))
+        roll = random.random()
+        if roll < 0.01:
+            quip = random.choice(SIDE_QUIPS)
+            await interaction.response.send_message(f"\U0001fa99 It landed on its side?! {quip}")
+        elif roll < 0.505:
+            await interaction.response.send_message("Heads")
+        else:
+            await interaction.response.send_message("Tails")
 
     @app_commands.command(name="gay", description="Check how gay someone is")
     @app_commands.describe(user="Person to check (defaults to you)")
